@@ -12,12 +12,16 @@ namespace chuni_hands {
         public int Id => _id;
 
         private Mat _startValue;
+        private Mat _pixelsD;
+        private Mat _matDiff;
         private readonly Config _config;
         private readonly int _id;
 
         public Sensor(int id, Config config) {
             _id = id;
             _config = config;
+            _pixelsD = new Mat();
+            _matDiff = new Mat();
         }
 
         private Mat GetPartial(Mat frame) {
@@ -40,7 +44,9 @@ namespace chuni_hands {
             var pixels = GetPartial(frame);
 
             if (_startValue == null || forceInit) {
-                _startValue = new Mat(pixels.Size, Emgu.CV.CvEnum.DepthType.Cv64F, pixels.NumberOfChannels);
+                if (_startValue == null) {
+                    _startValue = new Mat(pixels.Size, Emgu.CV.CvEnum.DepthType.Cv64F, pixels.NumberOfChannels);
+                }
                 pixels.ConvertTo(_startValue, _startValue.Depth);
                 _startValue /= 255;
 
@@ -49,12 +55,14 @@ namespace chuni_hands {
                 return;
             }
 
-            var pixelsD = new Mat(pixels.Size, Emgu.CV.CvEnum.DepthType.Cv64F, pixels.NumberOfChannels);
-            pixels.ConvertTo(pixelsD, pixelsD.Depth);
-            pixelsD /= 255;
+            if (_pixelsD.Size != pixels.Size || _pixelsD.NumberOfChannels != pixels.NumberOfChannels) {
+                _pixelsD.Create(pixels.Size, Emgu.CV.CvEnum.DepthType.Cv64F, pixels.NumberOfChannels);
+            }
+            pixels.ConvertTo(_pixelsD, _pixelsD.Depth);
+            _pixelsD /= 255;
 
-            var matDiff = pixelsD - _startValue;
-            var diff = matDiff.Dot(matDiff);
+            CvInvoke.Subtract(_pixelsD, _startValue, _matDiff);
+            var diff = _matDiff.Dot(_matDiff);
             if (_id == 0 && _config.LogDiff) {
                 Logger.Info($"diff: {diff}");
             }

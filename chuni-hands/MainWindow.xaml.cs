@@ -22,6 +22,7 @@ namespace chuni_hands {
 
         private Task _captureTask;
         private volatile bool _closing = false;
+        private volatile bool _isWindowActive = false;
 
         private readonly Config _config = new Config();
         private readonly HttpClient _http = new HttpClient();
@@ -48,10 +49,12 @@ namespace chuni_hands {
                 LogBox.AppendText(Environment.NewLine);
                 LogBox.ScrollToEnd();
             };
+
+            Activated += (sender, e) => _isWindowActive = true;
+            Deactivated += (sender, e) => _isWindowActive = false;
         }
 
-        private void FrameUpdate() {
-
+        private void ProcessFrame() {
             // compute
 
             foreach (var sensor in _sensors) {
@@ -62,23 +65,31 @@ namespace chuni_hands {
             // send key
 
             SendKey();
+        }
 
-            // update display
+        private readonly object _matLock = new object();
+
+        private void UpdateDisplay() {
+            if (!_config.ShowVideo) return;
 
             var length = _mat.Rows * _mat.Cols * _mat.NumberOfChannels;
             if (_matData.Length < length) {
                 _matData = new byte[length];
             }
 
-            _mat.CopyTo(_matData);
+            lock (_matLock) {
+                if (_mat.IsEmpty) return;
+                _mat.CopyTo(_matData);
+            }
 
             var bm = BitmapSource.Create(_mat.Cols, _mat.Rows, 96, 96, PixelFormats.Bgr24, null, _matData, _mat.Cols * _mat.NumberOfChannels);
             TheCanvas.Image = bm;
             TheCanvas.InvalidateVisual();
         }
 
+
         private void SendKey() {
-            if (IsActive) {
+            if (_isWindowActive) {
                 return;
             }
 
@@ -121,7 +132,7 @@ namespace chuni_hands {
         }
 
         private void StartCapture() {
-            var cap = new VideoCapture(_config.CameraId, VideoCapture.API.DShow);
+            var cap = new VideoCapture(_config.CameraId, VideoCapture.API.Any);
             if (!cap.IsOpened) {
                 Logger.Error("Failed to start video capture");
                 return;
@@ -135,6 +146,12 @@ namespace chuni_hands {
 
             _capture = cap;
             _capture.Read(_mat);
+
+            if (_mat.IsEmpty) {
+                Logger.Error("Camera returned an empty frame. It may not support the requested resolution or format.");
+                return;
+            }
+
             _config.CaptureWidth = _mat.Cols;
             _config.CaptureHeight = _mat.Rows;
 
@@ -161,15 +178,24 @@ namespace chuni_hands {
 
             while (!_closing) {
                 if (bootstrapFrames > 0) {
-                    _capture.Read(_mat);
+                    lock (_matLock) {
+                        _capture.Read(_mat);
+                    }
                     --bootstrapFrames;
                 }
                 else {
-                    if (!_config.FreezeVideo) {
-                        _capture.Read(_mat);
+                    lock (_matLock) {
+                        if (!_config.FreezeVideo) {
+                            _capture.Read(_mat);
+                        }
+                        if (!_mat.IsEmpty) {
+                            ProcessFrame();
+                        }
                     }
 
-                    Dispatcher?.BeginInvoke(new Action(FrameUpdate));
+                    if (!_mat.IsEmpty) {
+                        Dispatcher?.BeginInvoke(new Action(UpdateDisplay));
+                    }
                 }
 
                 // what the...?? well, it works
