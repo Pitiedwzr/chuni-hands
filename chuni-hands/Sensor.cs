@@ -56,7 +56,7 @@ namespace chuni_hands {
             }
 
             if (_pixelsD.Size != pixels.Size || _pixelsD.NumberOfChannels != pixels.NumberOfChannels) {
-                _pixelsD.Create(pixels.Size, Emgu.CV.CvEnum.DepthType.Cv64F, pixels.NumberOfChannels);
+                _pixelsD.Create(pixels.Rows, pixels.Cols, Emgu.CV.CvEnum.DepthType.Cv64F, pixels.NumberOfChannels);
             }
             pixels.ConvertTo(_pixelsD, _pixelsD.Depth);
             _pixelsD /= 255;
