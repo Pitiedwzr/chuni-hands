@@ -10,10 +10,6 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CameraHelperTest", "CameraHelperTest\CameraHelperTest.csproj", "{13F60778-2DF6-4723-BB87-2A433B822307}"
 EndProject
 Global
-	GlobalSection(SharedMSBuildProjectFiles) = preSolution
-		C:\Emgu\emgucv-windesktop 4.2.0.3662\Emgu.CV.Runtime\Windows\Emgu.CV.Runtime.Windows.projitems*{adc3c8e5-ebcd-4d3c-b3a4-20cfe0e42fc1}*SharedItemsImports = 13
-		C:\Emgu\emgucv-windesktop 4.2.0.3662\Emgu.CV.Runtime\Windows\Emgu.CV.Runtime.Windows.projitems*{f1fdd6c6-7b45-403d-9a53-8e9ca600bc3f}*SharedItemsImports = 4
-	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Debug|x64 = Debug|x64
