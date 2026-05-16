@@ -1,7 +1,11 @@
-chuni-hands
+chuni-hands (fork)
 ---
+Mysterious tool that detects things. 
 
-Mysterious tool that detects things.
+## What's in the fork
+
+- Fix camera usage
+- Fix performance issues
 
 ## User requirements
 
