@@ -1,0 +1,20 @@
+name: Build Project
+on: [push]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v3
+
+      - name: Build Solution
+        run: msbuild chuni-hands.sln /t:Build /p:Configuration=Release
+
+      - name: Upload result
+        uses: actions/upload-artifact@v3
+        with:
+          name: compiled-program
+          path: "**/Release/"
