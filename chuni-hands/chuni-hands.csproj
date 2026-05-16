@@ -141,5 +141,9 @@
       <Name>CameraHelper</Name>
     </ProjectReference>
   </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Emgu.CV" Version="4.2.0.3662" />
+    <PackageReference Include="Emgu.CV.runtime.windows" Version="4.2.0.3662" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

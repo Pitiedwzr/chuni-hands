@@ -11,7 +11,7 @@ jobs:
         uses: microsoft/setup-msbuild@v2
 
       - name: Restore NuGet Packages
-        run: nuget restore chuni-hands.sln
+        run: msbuild chuni-hands.sln -t:restore
 
       - name: Build Solution
         run: msbuild chuni-hands.sln /t:Build /p:Configuration=Release /p:Platform=x64
