@@ -5,8 +5,6 @@ VisualStudioVersion = 16.0.29728.190
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "chuni-hands", "chuni-hands\chuni-hands.csproj", "{F1FDD6C6-7B45-403D-9A53-8E9CA600BC3F}"
 EndProject
-Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Emgu.CV.Runtime.Windows", "C:\Emgu\emgucv-windesktop 4.2.0.3662\Emgu.CV.Runtime\Windows\Emgu.CV.Runtime.Windows.shproj", "{ADC3C8E5-EBCD-4D3C-B3A4-20CFE0E42FC1}"
-EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CameraHelper", "CameraHelper\CameraHelper.vcxproj", "{720D3AF0-6A71-422B-8A93-1DEECE9E330F}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CameraHelperTest", "CameraHelperTest\CameraHelperTest.csproj", "{13F60778-2DF6-4723-BB87-2A433B822307}"
