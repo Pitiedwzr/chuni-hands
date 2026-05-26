@@ -208,35 +208,34 @@ namespace chuni_hands {
             int emptyFrameCount = 0;
 
             while (!_closing) {
-                bool readSuccess = false;
+                bool readAttempted = false;
 
                 if (bootstrapFrames > 0) {
                     lock (_matLock) {
-                        readSuccess = _capture.Read(_mat);
+                        _capture.Read(_mat);
                     }
                     --bootstrapFrames;
                 }
                 else {
                     lock (_matLock) {
                         if (!_config.FreezeVideo) {
-                            readSuccess = _capture.Read(_mat);
-                        } else {
-                            readSuccess = true; // Pretend success if frozen
+                            _capture.Read(_mat);
+                            readAttempted = true;
                         }
 
-                        if (readSuccess && !_mat.IsEmpty) {
+                        if (!_mat.IsEmpty) {
                             emptyFrameCount = 0;
                             ProcessFrame();
                         }
                     }
 
-                    if (readSuccess && !_mat.IsEmpty) {
+                    if (!_mat.IsEmpty) {
                         Dispatcher?.BeginInvoke(new Action(UpdateDisplay));
                     }
                 }
 
-                // FIX: Detect if camera disconnected or stream died mid-use
-                if (!readSuccess || _mat.IsEmpty) {
+                // Detect if camera disconnected or stream died mid-use
+                if (readAttempted && _mat.IsEmpty) {
                     emptyFrameCount++;
                     if (emptyFrameCount > 30) {
                         Logger.Error("Camera stream lost (Too many empty frames). Please refresh or reconnect.");
