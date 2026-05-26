@@ -45,9 +45,11 @@ namespace chuni_hands {
             RefreshCameras();
 
             Logger.LogAdded += log => {
-                LogBox.AppendText(log);
-                LogBox.AppendText(Environment.NewLine);
-                LogBox.ScrollToEnd();
+                Dispatcher.InvokeAsync(() => { // Ensure logging is thread-safe for UI
+                    LogBox.AppendText(log);
+                    LogBox.AppendText(Environment.NewLine);
+                    LogBox.ScrollToEnd();
+                });
             };
 
             Activated += (sender, e) => _isWindowActive = true;
@@ -56,14 +58,12 @@ namespace chuni_hands {
 
         private void ProcessFrame() {
             // compute
-
             foreach (var sensor in _sensors) {
                 sensor.Update(_mat, _hasPendingReset);
             }
             _hasPendingReset = false;
 
             // send key
-
             SendKey();
         }
 
@@ -72,19 +72,32 @@ namespace chuni_hands {
         private void UpdateDisplay() {
             if (!_config.ShowVideo) return;
 
-            var length = _mat.Rows * _mat.Cols * _mat.NumberOfChannels;
-            if (_matData.Length < length) {
-                _matData = new byte[length];
-            }
+            int cols, rows, step;
 
             lock (_matLock) {
                 if (_mat.IsEmpty) return;
+
+                cols = _mat.Cols;
+                rows = _mat.Rows;
+                step = _mat.Step; // FIX: Use OpenCV's actual memory step (stride) instead of math
+
+                var length = rows * step;
+                if (_matData.Length < length) {
+                    _matData = new byte[length];
+                }
+
                 _mat.CopyTo(_matData);
             }
 
-            var bm = BitmapSource.Create(_mat.Cols, _mat.Rows, 96, 96, PixelFormats.Bgr24, null, _matData, _mat.Cols * _mat.NumberOfChannels);
-            TheCanvas.Image = bm;
-            TheCanvas.InvalidateVisual();
+            try {
+                // FIX: Pass 'step' (stride) here to prevent WPF crashes on padded images
+                var bm = BitmapSource.Create(cols, rows, 96, 96, PixelFormats.Bgr24, null, _matData, step);
+                TheCanvas.Image = bm;
+                TheCanvas.InvalidateVisual();
+            }
+            catch (Exception ex) {
+                Logger.Error($"Display error: {ex.Message}");
+            }
         }
 
 
@@ -132,9 +145,15 @@ namespace chuni_hands {
         }
 
         private void StartCapture() {
-            var cap = new VideoCapture(_config.CameraId, VideoCapture.API.Any);
+            // FIX: Try DirectShow (DShow) first. It is vastly more stable on Windows.
+            var cap = new VideoCapture(_config.CameraId, VideoCapture.API.DShow);
             if (!cap.IsOpened) {
-                Logger.Error("Failed to start video capture");
+                // Fallback to Any if DShow fails
+                cap = new VideoCapture(_config.CameraId, VideoCapture.API.Any);
+            }
+
+            if (!cap.IsOpened) {
+                Logger.Error("Failed to start video capture (Camera might be in use by another app)");
                 return;
             }
 
@@ -145,10 +164,22 @@ namespace chuni_hands {
             cap.SetCaptureProperty(Emgu.CV.CvEnum.CapProp.Exposure, _config.Exposure);
 
             _capture = cap;
-            _capture.Read(_mat);
 
-            if (_mat.IsEmpty) {
-                Logger.Error("Camera returned an empty frame. It may not support the requested resolution or format.");
+            // FIX: Give the camera a few attempts to warm up.
+            // Many cameras return empty frames on the first 3-5 reads.
+            bool frameGrabbed = false;
+            for (int i = 0; i < 15; i++) {
+                _capture.Read(_mat);
+                if (!_mat.IsEmpty) {
+                    frameGrabbed = true;
+                    break;
+                }
+                Thread.Sleep(100); // Wait 100ms between attempts
+            }
+
+            if (!frameGrabbed) {
+                Logger.Error("Camera connected, but returned an empty frame. It may not support the requested resolution or format.");
+                StopCapture(); // Clean up
                 return;
             }
 
@@ -162,7 +193,7 @@ namespace chuni_hands {
             Logger.Info("Stopping capture");
 
             _closing = true;
-            _captureTask?.Wait();
+            _captureTask?.Wait(2000); // Prevent infinite deadlock if thread is stuck
             _captureTask = null;
 
             _capture?.Stop();
@@ -173,32 +204,46 @@ namespace chuni_hands {
         }
 
         private void CaptureLoop() {
-            // give camera some time to auto adjust, so user don't need to press reset right after start
             var bootstrapFrames = _config.BootstrapSeconds * _config.Fps;
+            int emptyFrameCount = 0;
 
             while (!_closing) {
+                bool readSuccess = false;
+
                 if (bootstrapFrames > 0) {
                     lock (_matLock) {
-                        _capture.Read(_mat);
+                        readSuccess = _capture.Read(_mat);
                     }
                     --bootstrapFrames;
                 }
                 else {
                     lock (_matLock) {
                         if (!_config.FreezeVideo) {
-                            _capture.Read(_mat);
+                            readSuccess = _capture.Read(_mat);
+                        } else {
+                            readSuccess = true; // Pretend success if frozen
                         }
-                        if (!_mat.IsEmpty) {
+
+                        if (readSuccess && !_mat.IsEmpty) {
+                            emptyFrameCount = 0;
                             ProcessFrame();
                         }
                     }
 
-                    if (!_mat.IsEmpty) {
+                    if (readSuccess && !_mat.IsEmpty) {
                         Dispatcher?.BeginInvoke(new Action(UpdateDisplay));
                     }
                 }
 
-                // what the...?? well, it works
+                // FIX: Detect if camera disconnected or stream died mid-use
+                if (!readSuccess || _mat.IsEmpty) {
+                    emptyFrameCount++;
+                    if (emptyFrameCount > 30) {
+                        Logger.Error("Camera stream lost (Too many empty frames). Please refresh or reconnect.");
+                        break; // Exit loop
+                    }
+                }
+
                 Thread.Sleep(1000 / _config.Fps);
             }
         }
